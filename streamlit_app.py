@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 # --- DATA: load from Excel ---
 list1_df = pd.read_excel('list1.xlsx')  # Companies
