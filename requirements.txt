@@ -4,7 +4,6 @@ pandas
 numpy
 matplotlib.pyplot
 openpyxl
-matplotlib
 streamlit-matplotlib
 streamlit-aggrid
 streamlit-plotly-events
