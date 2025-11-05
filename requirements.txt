@@ -1,16 +1,5 @@
 streamlit
-pyplot
 pandas
 numpy
 plotly
 openpyxl
-streamlit-aggrid
-streamlit-plotly-events
-plotly
-plotly-express
-plotly.graph_objects
-plotly.figure_factory
-plotly.io
-plotly.subplots
-plotly.colors
-plotly.offline
