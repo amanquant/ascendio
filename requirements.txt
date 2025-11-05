@@ -2,9 +2,8 @@ streamlit
 pyplot
 pandas
 numpy
-matplotlib.pyplot
+plotly
 openpyxl
-streamlit-matplotlib
 streamlit-aggrid
 streamlit-plotly-events
 plotly
