@@ -1,114 +1,96 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.graph_objects as go
 
 # --- DATA: load from Excel ---
 list1_df = pd.read_excel('list1.xlsx')  # Companies
-list2_df = pd.read_excel('list2.xlsx')  # Sectors
-list3_df = pd.read_excel('list3.xlsx')  # Contacts
+list2_df = pd.read_excel('list2.xlsx')  # Sector/Company Extended
+list3_df = pd.read_excel('list3.xlsx')  # People / Relations
 
 st.title("🔎 FinGPT Company & Sector Analytics Engine")
 st.markdown(
-    "*Conversational search: ask about a company, info type (Revenue, EBITDA, Sector, Contacts, etc), and get analytics instantly!*"
+    "*Conversational search: ask about a company, info type (EBIT, emp, sector, management, ownership, extended analytics, contacts, full overview, M&A, etc.)*"
 )
 
 # -- 1. User Inputs --
-company_list = list1_df['Company'].dropna().unique()
+company_list = list1_df['company'].dropna().unique()
 company_name = st.selectbox("Select company to analyze", company_list)
 
 info_type = st.text_input(
-    "What info do you want? (e.g. EBITDA, revenue, sector analytics, contacts, full overview)"
+    "What info do you want? (e.g. ebit, emp, sector analytics, ownership, M&A, contacts, full overview)"
 )
 
 if st.button("Search / Analyze"):
-    company_data = list1_df[list1_df['company'] == company_name]
-    if company_data.empty:
-        st.error('Company not found in database.')
+    # -- 2. Core Lookups --
+    company_row = list1_df[list1_df['company'] == company_name]
+    sector_row = list2_df[list2_df['Company name'] == company_name]
+    
+    if company_row.empty:
+        st.error('Company not found in database!')
     else:
+        # ---- Company Overview (list1) ----
         st.subheader(f"Company Overview: {company_name}")
-        st.write(company_data.T)
+        show_cols = ['company','Nace','ebit','emp','Sector','name','title','name owner','ownership %']
+        st.table(company_row[show_cols].T)
 
-        # --- Core financials ---
-        sector_name = company_data['sector'].iloc[0]
-        sector_data = list2_df[list2_df['sector'] == sector_name]
+        # ---- Extended Analytics (list2) ----
+        if not sector_row.empty and (
+            any(x in info_type.lower() for x in [
+                'sector','extended','overview','ebitda','ebit','emp','m&a','clients','capital','acquired','ownership'
+            ])
+        ):
+            st.markdown(f"---\n**Extended Sector/Company Data**")
+            sector_cols = [
+                'Sector','Location','ebitda','ebit','emp','ST debt','New hires','Dep who hired the most',
+                'Average new employee pay','Last quarter new clients','n of acquired','% of diversified',
+                '% of consolidation','is the company been acquired by a PE Fund',
+                'is planning a m&a operation','is planning a capital increase'
+            ]
+            st.table(sector_row[sector_cols].T)
 
-        if any(x in info_type.lower() for x in ['ebitda', 'revenue', 'full', 'overview']):
-            st.markdown("**Financials**")
-            for col in ['revenue', 'ebitda']:
-                if col in company_data.columns:
-                    val = company_data[col].iloc[0]
-                    st.metric(label=col.capitalize(), value=val)
-
-        # --- Sector analytics ---
-        if ('sector' in info_type.lower()) or ('compare' in info_type.lower()) or ('overview' in info_type.lower()):
-            st.markdown(f"---\n**Sector: {sector_name}**")
-            if not sector_data.empty:
-                st.write(sector_data.T)
-
-                # Sector vs Company chart with Plotly
-                bars = []
-                labels = []
-                colors = []
-
-                for k in ['avg_revenue', 'avg_ebitda']:
-                    if k in sector_data.columns and k.replace("avg_", "") in company_data.columns:
-                        sector_val = sector_data[k].iloc[0]
-                        company_val = company_data[k.replace("avg_", "")].iloc[0]
-                        metric_name = k.replace('avg_', '').capitalize()
-                        labels.extend([f"Sector Avg {metric_name}", f"{company_name} {metric_name}"])
-                        bars.extend([sector_val, company_val])
-                        colors.extend(['grey', 'royalblue'])
-
-                fig = go.Figure(data=[
-                    go.Bar(
-                        x=labels,
-                        y=bars,
-                        marker_color=colors,
-                        text=[f"{v:,}" for v in bars],
-                        textposition="auto"
-                    )
-                ])
-                fig.update_layout(yaxis_title="Value (mln)", title="Company vs Sector Comparison")
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.write("_No sector data available._")
-
-        # --- Peer comparison within sector ---
-        if ('peer' in info_type.lower()) or ('full' in info_type.lower()) or ('overview' in info_type.lower()):
-            st.markdown(f"---\n**Peer Comparison in {sector_name}**")
-            sector_peers = list1_df[list1_df['sector'] == sector_name].sort_values(by='revenue', ascending=False)
-            st.dataframe(sector_peers[['company', 'revenue', 'ebitda']])
-
-            # Optional: Plotly bar chart for peer revenues
-            fig_peers = go.Figure(
-                data=[
-                    go.Bar(
-                        x=sector_peers['company'],
-                        y=sector_peers['revenue'],
-                        marker_color='royalblue',
-                        text=[f"{v:,}" for v in sector_peers['revenue']],
-                        textposition="auto"
-                    )
-                ]
+            # --- Plotly Bar Chart: EBIT vs EBITDA vs EMP ---
+            chart_metrics = ['ebit', 'ebitda', 'emp']
+            chart_vals = [sector_row[m].iloc[0] if m in sector_row.columns else None for m in chart_metrics]
+            fig = go.Figure(data=[
+                go.Bar(
+                    x=chart_metrics,
+                    y=chart_vals,
+                    marker_color=["royalblue","green","grey"],
+                    text=[f"{v:,}" for v in chart_vals],
+                    textposition="auto"
+                )
+            ])
+            fig.update_layout(
+                title="EBIT / EBITDA / Employees",
+                yaxis_title="Value",
+                xaxis_title="Metric"
             )
-            fig_peers.update_layout(
-                xaxis_title="Company",
-                yaxis_title="Revenue",
-                title=f"Revenue Comparison among {sector_name} Peers"
-            )
-            st.plotly_chart(fig_peers, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # --- Special fields analytics ---
+            st.markdown("**Strategic Actions:**")
+            if sector_row['is planning a m&a operation'].iloc[0]:
+                st.info("Company is planning an M&A operation.")
+            if sector_row['is planning a capital increase'].iloc[0]:
+                st.info("Company is planning a capital increase.")
+            if sector_row['is the company been acquired by a PE Fund'].iloc[0]:
+                st.warning("Acquired by Private Equity Fund.")
 
-        # --- Contact info ---
-        if 'contact' in info_type.lower() or 'full' in info_type.lower():
-            st.markdown("---")
-            with st.expander("Show Company Contacts"):
-                contacts = list3_df[list3_df['company'] == company_name]
-                if contacts.empty:
-                    st.write("No contacts found.")
+        # ---- Ownership Info (list1) ----
+        if 'ownership' in info_type.lower() or 'full' in info_type.lower():
+            st.markdown("**Ownership**")
+            st.write(f"-- Name owner: {company_row['name owner'].iloc[0]}")
+            st.write(f"-- Ownership %: {company_row['ownership %'].iloc[0]}")
+
+        # ---- Contact & Person relationships (list3) ----
+        if 'contact' in info_type.lower() or 'relation' in info_type.lower() or 'full' in info_type.lower():
+            with st.expander("Show Person/Contact Relations"):
+                # Find all persons linked to this company (exact and in 'Companies')
+                persons_direct = list3_df[list3_df['Main Company'] == company_name]
+                persons_indirect = list3_df[list3_df['Companies'].apply(lambda x: company_name in str(x))]
+                persons = pd.concat([persons_direct, persons_indirect]).drop_duplicates()
+                if persons.empty:
+                    st.write("No contacts or relations found.")
                 else:
-                    for idx, row in contacts.iterrows():
-                        st.write(f"**{row['name']}** ({row['role']})")
-                        st.write(f"Email: {row['email']}")
-                        st.write("---")
-
+                    contact_cols = ['Tax code','Born in','Current roles','Companies','Main Company','Relation','Profile of relation']
+                    st.table(persons[contact_cols])
