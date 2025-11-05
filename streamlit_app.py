@@ -14,7 +14,7 @@ st.markdown(
 )
 
 # -- 1. User Inputs --
-company_list = list1_df['company'].dropna().unique()
+company_list = list1_df['Company'].dropna().unique()
 company_name = st.selectbox("Select company to analyze", company_list)
 
 info_type = st.text_input(
